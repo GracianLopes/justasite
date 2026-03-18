@@ -173,7 +173,7 @@ addMemoryBtn.addEventListener('click', () => {
     imageUpload.click();
 });
 
-// ===== GENERATE SHARE LINK (Via Firebase Realtime DB) =====
+// ===== GENERATE SHARE LINK (Via Pastebin API) =====
 generateLinkBtn.addEventListener('click', async () => {
     if (!memories || memories.length === 0) {
         alert('Add at least one memory before generating a link.');
@@ -182,8 +182,7 @@ generateLinkBtn.addEventListener('click', async () => {
 
     const dataPackage = {
         memories: memories,
-        subtext: subtext,
-        createdAt: new Date().toISOString()
+        subtext: subtext
     };
 
     const jsonString = JSON.stringify(dataPackage);
@@ -196,41 +195,52 @@ generateLinkBtn.addEventListener('click', async () => {
 
     try {
         generateLinkBtn.disabled = true;
-        generateLinkBtn.innerText = 'Creating link...';
+        generateLinkBtn.innerText = 'Creating short link...';
 
-        // Generate a unique ID
-        const linkId = Math.random().toString(36).substr(2, 9);
-        
-        // Store in localStorage for fallback (same device)
-        localStorage.setItem(linkId, JSON.stringify({
-            data: dataPackage,
-            expiry: Date.now() + (30 * 24 * 60 * 60 * 1000) // 30 days
-        }));
+        // Upload to Pastebin (no auth needed)
+        const formData = new FormData();
+        formData.append('api_dev_key', 'dummy_key');
+        formData.append('api_option', 'paste');
+        formData.append('api_paste_code', jsonString);
+        formData.append('api_paste_private', '1'); // unlisted
+        formData.append('api_paste_expire_date', '30D');
 
-        // Try to upload to Firebase for cross-device sharing
-        try {
-            const firebaseRef = firebase.database().ref(`shares/${linkId}`);
-            await firebaseRef.set({
-                data: dataPackage,
-                createdAt: firebase.database.ServerValue.TIMESTAMP
-            });
-            console.log('Data uploaded to Firebase');
-        } catch (firebaseErr) {
-            console.warn('Firebase upload failed (will use localStorage fallback):', firebaseErr.message);
+        const pasteResponse = await fetch('https://pastebin.com/api/api_post.php', {
+            method: 'POST',
+            body: formData
+        });
+
+        const pasteUrl = await pasteResponse.text();
+
+        if (pasteUrl.includes('pastebin.com')) {
+            // Extract paste ID from URL
+            const pasteId = pasteUrl.split('/').pop();
+            const baseUrl = window.location.origin + window.location.pathname.replace('index.html', '');
+            const viewerUrl = `${baseUrl}viewer.html?p=${pasteId}`;
+
+            shareLinkInput.value = viewerUrl;
+            linkPopup.classList.remove('hidden');
+            console.log('Short link created:', viewerUrl);
+        } else {
+            throw new Error('Failed to create paste');
         }
 
-        // Create the link
+    } catch (err) {
+        console.warn('Pastebin failed, using localStorage fallback:', err.message);
+        
+        // Fallback: use localStorage
+        const linkId = Math.random().toString(36).substr(2, 9);
+        localStorage.setItem(linkId, JSON.stringify({
+            data: dataPackage,
+            expiry: Date.now() + (30 * 24 * 60 * 60 * 1000)
+        }));
+
         const baseUrl = window.location.origin + window.location.pathname.replace('index.html', '');
         const viewerUrl = `${baseUrl}viewer.html?id=${linkId}`;
 
         shareLinkInput.value = viewerUrl;
         linkPopup.classList.remove('hidden');
-        
-        console.log('Link ID:', linkId);
-
-    } catch (err) {
-        alert('Failed to create share link.\n\nError: ' + err.message);
-        console.error('Error:', err);
+        alert('⚠️ Link created (works on same device)');
     } finally {
         generateLinkBtn.disabled = false;
         generateLinkBtn.innerText = '🔗 Generate share link';

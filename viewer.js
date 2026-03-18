@@ -13,39 +13,39 @@ const closeModal = document.querySelector('.close');
 
 // Get data from URL parameter
 const urlParams = new URLSearchParams(window.location.search);
+const pasteId = urlParams.get('p');
 const linkId = urlParams.get('id');
 
-if (!linkId) {
+if (!pasteId && !linkId) {
     alert('No shared data found. Invalid link.');
-} else {
-    // Try Firebase first, then fallback to localStorage
-    loadMemories(linkId);
+} else if (pasteId) {
+    // Load from Pastebin
+    loadFromPastebin(pasteId);
+} else if (linkId) {
+    // Load from localStorage fallback
+    loadFromLocalStorage(linkId);
 }
 
-async function loadMemories(id) {
+async function loadFromPastebin(id) {
     try {
-        // Try Firebase first
-        try {
-            const firebaseRef = firebase.database().ref(`shares/${id}`);
-            const snapshot = await firebaseRef.get();
-            
-            if (snapshot.exists()) {
-                const firebaseData = snapshot.val();
-                const dataPackage = firebaseData.data;
-                
-                const memories = dataPackage.memories || [];
-                const subtext = dataPackage.subtext || 'our beautiful memories ❤️';
+        const response = await fetch(`https://pastebin.com/raw/${id}`);
+        const jsonString = await response.text();
 
-                sublineEl.innerText = subtext;
-                renderGallery(memories);
-                console.log('Successfully loaded from Firebase');
-                return;
-            }
-        } catch (firebaseErr) {
-            console.warn('Firebase load failed, trying localStorage:', firebaseErr.message);
-        }
+        const dataPackage = JSON.parse(jsonString);
+        const memories = dataPackage.memories || [];
+        const subtext = dataPackage.subtext || 'our beautiful memories ❤️';
 
-        // Fallback to localStorage
+        sublineEl.innerText = subtext;
+        renderGallery(memories);
+        console.log('Successfully loaded from Pastebin');
+    } catch (err) {
+        alert('Failed to load shared memories.\n\nError: ' + err.message);
+        console.error('Pastebin error:', err);
+    }
+}
+
+function loadFromLocalStorage(id) {
+    try {
         const storedData = localStorage.getItem(id);
         
         if (!storedData) {
@@ -69,10 +69,9 @@ async function loadMemories(id) {
         sublineEl.innerText = subtext;
         renderGallery(memories);
         console.log('Successfully loaded from localStorage');
-        
     } catch (err) {
         alert('Failed to load shared memories.\n\nError: ' + err.message);
-        console.error('Error:', err);
+        console.error('localStorage error:', err);
     }
 }
 
