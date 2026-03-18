@@ -13,86 +13,76 @@ const closeModal = document.querySelector('.close');
 
 // Get data from URL parameter
 const urlParams = new URLSearchParams(window.location.search);
+const compressedData = urlParams.get('d');
 const linkId = urlParams.get('id');
 
-if (!linkId) {
+console.log('URL params:', { d: !!compressedData, id: linkId });
+
+if (!compressedData && !linkId) {
     alert('No shared data found. Invalid link.');
-} else {
-    loadMemories(linkId);
+} else if (compressedData) {
+    // Decompress from URL
+    loadFromCompressed(compressedData);
+} else if (linkId) {
+    // Try localStorage or old method
+    loadFromId(linkId);
 }
 
-async function loadMemories(id) {
+function loadFromCompressed(compressed) {
     try {
-        let dataPackage = null;
+        if (typeof LZString === 'undefined') {
+            throw new Error('Decompression library not loaded');
+        }
 
-        // First, try to load from localStorage (same device)
+        const jsonString = LZString.decompressFromEncodedURIComponent(compressed);
+        
+        if (!jsonString) {
+            throw new Error('Failed to decompress - data may be corrupted');
+        }
+
+        const dataPackage = JSON.parse(jsonString);
+        const memories = dataPackage.memories || [];
+        const subtext = dataPackage.subtext || 'our beautiful memories ❤️';
+
+        sublineEl.innerText = subtext;
+        renderGallery(memories);
+        console.log('✅ Successfully loaded from compressed URL');
+
+    } catch (err) {
+        alert('Failed to load memories.\n\nError: ' + err.message);
+        console.error('Decompression error:', err);
+    }
+}
+
+function loadFromId(id) {
+    try {
+        // Try localStorage first
         const storedJson = localStorage.getItem(`memo_${id}`);
         const expiry = localStorage.getItem(`memo_exp_${id}`);
 
-        if (storedJson && expiry) {
-            // Check if expired
-            if (Date.now() > parseInt(expiry)) {
-                localStorage.removeItem(`memo_${id}`);
-                localStorage.removeItem(`memo_exp_${id}`);
-                console.log('localStorage data expired, trying Supabase...');
-            } else {
-                // Load from localStorage
-                try {
-                    dataPackage = JSON.parse(storedJson);
-                    const memories = dataPackage.memories || [];
-                    const subtext = dataPackage.subtext || 'our beautiful memories ❤️';
-
-                    sublineEl.innerText = subtext;
-                    renderGallery(memories);
-                    console.log('✅ Loaded from localStorage');
-                    return;
-                } catch (parseErr) {
-                    console.error('Failed to parse localStorage:', parseErr);
-                    localStorage.removeItem(`memo_${id}`);
-                }
-            }
+        if (!storedJson || !expiry) {
+            alert('Link not found. Please generate a new link or use the same device.');
+            return;
         }
 
-        // If not in localStorage, try Supabase (cross-device)
-        console.log('Fetching from Supabase for cross-device access...');
-        const supabaseUrl = 'https://aolmcvbtfkkxjqawwiqy.supabase.co';
-        const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFvbG1jdmJ0ZmtreGpxYXd3aXF5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3MTA4Njc5MjgsImV4cCI6MTk5Njc0NzkyOH0.KDH4VpYYT5qQJg5QQrQqYYQqYYQqYYQqYYQqYYQqYYQ';
-        
-        const response = await fetch(
-            `${supabaseUrl}/rest/v1/anniversary_shares?link_id=eq.${id}`,
-            {
-                method: 'GET',
-                headers: {
-                    'apikey': supabaseKey,
-                    'Authorization': `Bearer ${supabaseKey}`
-                }
-            }
-        );
-
-        if (response.ok) {
-            const rows = await response.json();
-            
-            if (rows && rows.length > 0) {
-                dataPackage = rows[0].data;
-                const memories = dataPackage.memories || [];
-                const subtext = dataPackage.subtext || 'our beautiful memories ❤️';
-
-                sublineEl.innerText = subtext;
-                renderGallery(memories);
-                console.log('✅ Loaded from Supabase - works cross-device!');
-                return;
-            }
-        } else {
-            console.warn('Supabase response error:', response.status);
+        if (Date.now() > parseInt(expiry)) {
+            localStorage.removeItem(`memo_${id}`);
+            localStorage.removeItem(`memo_exp_${id}`);
+            alert('This link has expired (valid for 30 days).');
+            return;
         }
 
-        // If we get here, data not found anywhere
-        alert('Shared memories not found. The link may have expired or is invalid.');
-        console.log('Link ID:', id);
+        const dataPackage = JSON.parse(storedJson);
+        const memories = dataPackage.memories || [];
+        const subtext = dataPackage.subtext || 'our beautiful memories ❤️';
+
+        sublineEl.innerText = subtext;
+        renderGallery(memories);
+        console.log('✅ Loaded from localStorage');
 
     } catch (err) {
-        console.error('Error loading memories:', err);
-        alert('Failed to load shared memories.\n\nError: ' + err.message);
+        alert('Failed to load memories.\n\nError: ' + err.message);
+        console.error('Error:', err);
     }
 }
 

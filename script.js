@@ -173,8 +173,8 @@ addMemoryBtn.addEventListener('click', () => {
     imageUpload.click();
 });
 
-// ===== GENERATE SHARE LINK (Cross-Device with Supabase) =====
-generateLinkBtn.addEventListener('click', async () => {
+// ===== GENERATE SHARE LINK (Cross-Device via URLSafe Compression) =====
+generateLinkBtn.addEventListener('click', () => {
     if (!memories || memories.length === 0) {
         alert('Add at least one memory before generating a link.');
         return;
@@ -182,72 +182,64 @@ generateLinkBtn.addEventListener('click', async () => {
 
     const dataPackage = {
         memories: memories,
-        subtext: subtext
+        subtext: subtext,
+        created: new Date().toISOString()
     };
 
     const jsonString = JSON.stringify(dataPackage);
-    const sizeInMB = jsonString.length / (1024 * 1024);
+    const sizeInBytes = jsonString.length;
+    const sizeInMB = sizeInBytes / (1024 * 1024);
 
-    if (sizeInMB > 10) {
-        alert(`⚠️ Data is ${sizeInMB.toFixed(2)}MB - consider reducing images.`);
+    console.log('Data size:', sizeInMB.toFixed(2), 'MB');
+
+    if (sizeInMB > 8) {
+        alert(`⚠️ Data is ${sizeInMB.toFixed(2)}MB - too large for URL sharing. Please reduce images.`);
+        generateLinkBtn.disabled = false;
+        generateLinkBtn.innerText = '🔗 Generate share link';
+        return;
     }
 
     try {
         generateLinkBtn.disabled = true;
-        generateLinkBtn.innerText = 'Creating link...';
+        generateLinkBtn.innerText = 'Compressing...';
 
-        // Generate a unique short ID
-        const linkId = Math.random().toString(36).substr(2, 8).toUpperCase();
-        
-        // Store in localStorage (works on same device immediately)
-        localStorage.setItem(`memo_${linkId}`, jsonString);
-        localStorage.setItem(`memo_exp_${linkId}`, (Date.now() + (30 * 24 * 60 * 60 * 1000)).toString());
-        
-        console.log('Stored locally with ID:', linkId);
-
-        // Also upload to Supabase for cross-device access
-        try {
-            const supabaseUrl = 'https://aolmcvbtfkkxjqawwiqy.supabase.co';
-            const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFvbG1jdmJ0ZmtreGpxYXd3aXF5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3MTA4Njc5MjgsImV4cCI6MTk5Njc0NzkyOH0.KDH4VpYYT5qQJg5QQrQqYYQqYYQqYYQqYYQqYYQqYYQ';
-            
-            const response = await fetch(`${supabaseUrl}/rest/v1/anniversary_shares`, {
-                method: 'POST',
-                headers: {
-                    'apikey': supabaseKey,
-                    'Authorization': `Bearer ${supabaseKey}`,
-                    'Content-Type': 'application/json',
-                    'Prefer': 'return=minimal'
-                },
-                body: JSON.stringify({
-                    link_id: linkId,
-                    data: dataPackage,
-                    created_at: new Date().toISOString(),
-                    expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
-                })
-            });
-
-            if (response.ok) {
-                console.log('✅ Uploaded to Supabase for cross-device sharing');
-            } else {
-                const error = await response.text();
-                console.warn('⚠️ Supabase upload failed (will still work on same device):', error);
-            }
-        } catch (uploadErr) {
-            console.warn('⚠️ Could not upload to Supabase (will use localStorage):', uploadErr.message);
+        // Use LZ-String for compression
+        if (typeof LZString === 'undefined') {
+            throw new Error('Compression library not loaded. Please refresh.');
         }
 
-        // Create SHORT link with just the ID
+        // Compress with different methods to find the best one
+        const compressed = LZString.compressToEncodedURIComponent(jsonString);
+        
+        if (!compressed) {
+            throw new Error('Compression failed');
+        }
+
+        const compressedSize = compressed.length;
+        const ratio = ((1 - compressedSize / sizeInBytes) * 100).toFixed(1);
+        
+        console.log('Compressed size:', (compressedSize / 1024).toFixed(2), 'KB');
+        console.log('Compression ratio:', ratio, '%');
+
+        // Also store in localStorage for same-device use
+        const linkId = Math.random().toString(36).substr(2, 8).toUpperCase();
+        localStorage.setItem(`memo_${linkId}`, jsonString);
+        localStorage.setItem(`memo_exp_${linkId}`, (Date.now() + 30 * 24 * 60 * 60 * 1000).toString());
+
+        // Create link with embedded compressed data
         const baseUrl = window.location.origin + window.location.pathname.replace('index.html', '');
-        const viewerUrl = `${baseUrl}viewer.html?id=${linkId}`;
+        const viewerUrl = `${baseUrl}viewer.html?d=${compressed}`;
 
         shareLinkInput.value = viewerUrl;
         linkPopup.classList.remove('hidden');
 
-        console.log('Link created:', viewerUrl);
-        console.log('Link length:', viewerUrl.length, 'characters');
+        console.log('Link created - length:', viewerUrl.length, 'characters');
+        if (viewerUrl.length > 8000) {
+            alert('⚠️ Link is long but should still work. Copy and paste carefully.');
+        }
 
     } catch (err) {
-        alert('Failed to create share link.\n\nError: ' + err.message);
+        alert('Failed to create link.\n\nError: ' + err.message);
         console.error('Error:', err);
     } finally {
         generateLinkBtn.disabled = false;
