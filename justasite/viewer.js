@@ -11,32 +11,32 @@ const modalImg = document.getElementById('modalImage');
 const modalCaption = document.getElementById('modalCaption');
 const closeModal = document.querySelector('.close');
 
-// Get data ID from URL
+// Get data from localStorage using session ID
 const urlParams = new URLSearchParams(window.location.search);
-const blobId = urlParams.get('id');
+const sessionId = urlParams.get('session');
 
-if (!blobId) {
+if (!sessionId) {
     alert('No shared data found.');
 } else {
-    // Fetch data from jsonblob.com
-    fetch(`https://jsonblob.com/api/jsonBlob/${blobId}`)
-        .then(response => {
-            if (!response.ok) {
-                throw new Error(`HTTP ${response.status}`);
-            }
-            return response.json();
-        })
-        .then(data => {
+    try {
+        // Retrieve data from localStorage
+        const jsonString = localStorage.getItem(sessionId);
+        
+        if (!jsonString) {
+            alert('Shared memories not found. The link may have expired or been used on a different device/browser.');
+            console.error('Session ID not found in localStorage:', sessionId);
+        } else {
+            const data = JSON.parse(jsonString);
             const memories = data.memories || [];
             const subtext = data.subtext || 'our beautiful memories ❤️';
 
             sublineEl.innerText = subtext;
             renderGallery(memories);
-        })
-        .catch(err => {
-            alert('Failed to load shared memories. The link may have expired.\n\nError: ' + err.message);
-            console.error(err);
-        });
+        }
+    } catch (err) {
+        alert('Failed to load shared memories.\n\nError: ' + err.message);
+        console.error(err);
+    }
 }
 
 // Render gallery (read-only)

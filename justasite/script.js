@@ -173,7 +173,7 @@ addMemoryBtn.addEventListener('click', () => {
     imageUpload.click();
 });
 
-// ===== GENERATE SHARE LINK (using jsonblob.com) =====
+// ===== GENERATE SHARE LINK (using localStorage + Session ID) =====
 generateLinkBtn.addEventListener('click', async () => {
     if (!memories || memories.length === 0) {
         alert('Add at least one memory before generating a link.');
@@ -188,47 +188,30 @@ generateLinkBtn.addEventListener('click', async () => {
     const jsonString = JSON.stringify(dataPackage);
     const sizeInMB = jsonString.length / (1024 * 1024);
 
-    if (sizeInMB > 4.5) {
-        alert(`❌ Total data size is ${sizeInMB.toFixed(2)}MB, which is close to the 5MB limit. Please reduce the number of photos.`);
+    if (sizeInMB > 50) {
+        alert(`❌ Total data size is ${sizeInMB.toFixed(2)}MB. Please reduce the number of photos.`);
         return;
     }
 
     try {
         generateLinkBtn.disabled = true;
-        generateLinkBtn.innerText = 'Uploading...';
+        generateLinkBtn.innerText = 'Creating share link...';
 
-        const response = await fetch('https://jsonblob.com/api/jsonBlob', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: jsonString
-        });
+        // Generate a unique session ID
+        const sessionId = 'session_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
 
-        if (!response.ok) {
-            const errorText = await response.text();
-            throw new Error(`Server responded with ${response.status}: ${errorText.substring(0, 100)}`);
-        }
+        // Store data in localStorage with session ID as key
+        localStorage.setItem(sessionId, jsonString);
 
-        // The ID is in the Location header
-        const location = response.headers.get('Location');
-        if (!location) {
-            throw new Error('No Location header received');
-        }
+        // Generate the viewer URL with session ID
+        const baseUrl = window.location.origin + window.location.pathname.replace('index.html', '');
+        const viewerUrl = `${baseUrl}viewer.html?session=${sessionId}`;
 
-        // Extract ID from location URL (e.g., https://jsonblob.com/api/jsonBlob/123456789)
-        const id = location.split('/').pop();
+        shareLinkInput.value = viewerUrl;
+        linkPopup.classList.remove('hidden');
 
-        if (id) {
-            const baseUrl = window.location.origin + window.location.pathname.replace('index.html', '');
-            const viewerUrl = `${baseUrl}viewer.html?id=${id}`;
-            shareLinkInput.value = viewerUrl;
-            linkPopup.classList.remove('hidden');
-        } else {
-            alert('Failed to extract ID from response.');
-        }
     } catch (err) {
-        alert('Upload failed. Please check your internet and try again.\n\nError: ' + err.message);
+        alert('Failed to create share link.\n\nError: ' + err.message);
         console.error('Upload error:', err);
     } finally {
         generateLinkBtn.disabled = false;
