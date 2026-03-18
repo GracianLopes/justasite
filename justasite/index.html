@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Our Anniversary · Admin</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=Poppins:wght@300;400;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <div class="card">
+            <h1 id="anniversaryHeading">6th Month Anniversary ❤️</h1>
+            <p id="romanticLine" class="subheading">our beautiful memories ✨</p>
+
+            <!-- Photo Gallery -->
+            <div id="gallery" class="gallery"></div>
+
+            <!-- Add Memory Button -->
+            <button id="addMemoryBtn" class="add-btn">+ Add memory</button>
+
+            <!-- Hidden file input for photos -->
+            <input type="file" id="imageUpload" accept="image/*" style="display: none;">
+
+            <!-- Edit Buttons -->
+            <div class="button-group">
+                <button id="editSubtextBtn">📝 Edit subtext</button>
+                <button id="generateLinkBtn" class="special-btn">🔗 Generate share link</button>
+            </div>
+
+            <!-- Popup for the generated link -->
+            <div id="linkPopup" class="popup hidden">
+                <p>Share this link with her:</p>
+                <input type="text" id="shareLinkInput" readonly>
+                <button id="copyLinkBtn">📋 Copy</button>
+                <button id="closePopupBtn">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal for enlarged image -->
+    <div id="imageModal" class="modal">
+        <span class="close">&times;</span>
+        <img class="modal-content" id="modalImage">
+        <div id="modalCaption" class="modal-caption"></div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
