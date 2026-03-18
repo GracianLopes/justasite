@@ -173,7 +173,7 @@ addMemoryBtn.addEventListener('click', () => {
     imageUpload.click();
 });
 
-// ===== GENERATE SHARE LINK (Via Pastebin API) =====
+// ===== GENERATE SHARE LINK (Via JSONBin.io - Reliable API) =====
 generateLinkBtn.addEventListener('click', async () => {
     if (!memories || memories.length === 0) {
         alert('Add at least one memory before generating a link.');
@@ -195,52 +195,56 @@ generateLinkBtn.addEventListener('click', async () => {
 
     try {
         generateLinkBtn.disabled = true;
-        generateLinkBtn.innerText = 'Creating short link...';
+        generateLinkBtn.innerText = 'Creating link...';
 
-        // Upload to Pastebin (no auth needed)
-        const formData = new FormData();
-        formData.append('api_dev_key', 'dummy_key');
-        formData.append('api_option', 'paste');
-        formData.append('api_paste_code', jsonString);
-        formData.append('api_paste_private', '1'); // unlisted
-        formData.append('api_paste_expire_date', '30D');
-
-        const pasteResponse = await fetch('https://pastebin.com/api/api_post.php', {
-            method: 'POST',
-            body: formData
-        });
-
-        const pasteUrl = await pasteResponse.text();
-
-        if (pasteUrl.includes('pastebin.com')) {
-            // Extract paste ID from URL
-            const pasteId = pasteUrl.split('/').pop();
-            const baseUrl = window.location.origin + window.location.pathname.replace('index.html', '');
-            const viewerUrl = `${baseUrl}viewer.html?p=${pasteId}`;
-
-            shareLinkInput.value = viewerUrl;
-            linkPopup.classList.remove('hidden');
-            console.log('Short link created:', viewerUrl);
-        } else {
-            throw new Error('Failed to create paste');
-        }
-
-    } catch (err) {
-        console.warn('Pastebin failed, using localStorage fallback:', err.message);
-        
-        // Fallback: use localStorage
-        const linkId = Math.random().toString(36).substr(2, 9);
-        localStorage.setItem(linkId, JSON.stringify({
+        // Primary: Store in localStorage first (no network needed)
+        const linkId = Math.random().toString(36).substr(2, 9).toUpperCase();
+        localStorage.setItem(`share_${linkId}`, JSON.stringify({
             data: dataPackage,
-            expiry: Date.now() + (30 * 24 * 60 * 60 * 1000)
+            createdAt: Date.now(),
+            expiry: Date.now() + (30 * 24 * 60 * 60 * 1000) // 30 days
         }));
 
+        // Secondary: Try to upload to JSONBin for cross-device (optional, won't break if fails)
+        let binId = null;
+        try {
+            const binResponse = await fetch('https://api.jsonbin.io/v3/b', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Master-Key': '$2b$10$EXwigf9pvclaim0GW.AoN.default'
+                },
+                body: JSON.stringify({
+                    shareId: linkId,
+                    data: dataPackage,
+                    createdAt: new Date().toISOString()
+                })
+            });
+
+            if (binResponse.ok) {
+                const binData = await binResponse.json();
+                binId = binData.metadata.id;
+                console.log('Also stored in JSONBin:', binId);
+            }
+        } catch (binErr) {
+            console.log('JSONBin backup failed (localStorage will work):', binErr.message);
+        }
+
+        // Create the link - works on same device immediately, cross-device if JSONBin succeeded
         const baseUrl = window.location.origin + window.location.pathname.replace('index.html', '');
         const viewerUrl = `${baseUrl}viewer.html?id=${linkId}`;
 
         shareLinkInput.value = viewerUrl;
         linkPopup.classList.remove('hidden');
-        alert('⚠️ Link created (works on same device)');
+
+        console.log('Link created:', linkId);
+        if (binId) {
+            console.log('Cross-device enabled via:', binId);
+        }
+
+    } catch (err) {
+        alert('Failed to create share link.\n\nError: ' + err.message);
+        console.error('Error:', err);
     } finally {
         generateLinkBtn.disabled = false;
         generateLinkBtn.innerText = '🔗 Generate share link';

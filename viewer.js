@@ -13,65 +13,73 @@ const closeModal = document.querySelector('.close');
 
 // Get data from URL parameter
 const urlParams = new URLSearchParams(window.location.search);
-const pasteId = urlParams.get('p');
 const linkId = urlParams.get('id');
 
-if (!pasteId && !linkId) {
+if (!linkId) {
     alert('No shared data found. Invalid link.');
-} else if (pasteId) {
-    // Load from Pastebin
-    loadFromPastebin(pasteId);
-} else if (linkId) {
-    // Load from localStorage fallback
-    loadFromLocalStorage(linkId);
+} else {
+    loadMemories(linkId);
 }
 
-async function loadFromPastebin(id) {
+async function loadMemories(id) {
     try {
-        const response = await fetch(`https://pastebin.com/raw/${id}`);
-        const jsonString = await response.text();
+        let dataPackage = null;
 
-        const dataPackage = JSON.parse(jsonString);
-        const memories = dataPackage.memories || [];
-        const subtext = dataPackage.subtext || 'our beautiful memories ❤️';
+        // Try localStorage first (works immediately, same device)
+        const localData = localStorage.getItem(`share_${id}`);
+        if (localData) {
+            const parsedData = JSON.parse(localData);
+            
+            // Check if link has expired
+            if (parsedData.expiry && Date.now() > parsedData.expiry) {
+                alert('This link has expired (valid for 30 days).');
+                localStorage.removeItem(`share_${id}`);
+            } else {
+                dataPackage = parsedData.data;
+                console.log('Loaded from localStorage');
+            }
+        }
 
-        sublineEl.innerText = subtext;
-        renderGallery(memories);
-        console.log('Successfully loaded from Pastebin');
-    } catch (err) {
-        alert('Failed to load shared memories.\n\nError: ' + err.message);
-        console.error('Pastebin error:', err);
-    }
-}
+        // If not in localStorage, try JSONBin (cross-device)
+        if (!dataPackage) {
+            try {
+                // Search for the share on JSONBin
+                const binResponse = await fetch(`https://api.jsonbin.io/v3/b`, {
+                    method: 'GET',
+                    headers: {
+                        'X-Master-Key': '$2b$10$EXwigf9pvclaim0GW.AoN.default'
+                    }
+                });
 
-function loadFromLocalStorage(id) {
-    try {
-        const storedData = localStorage.getItem(id);
-        
-        if (!storedData) {
+                if (binResponse.ok) {
+                    const bins = await binResponse.json();
+                    // Find the bin with matching shareId
+                    const foundBin = bins.records?.find(bin => bin.shareId === id);
+                    if (foundBin) {
+                        dataPackage = foundBin.data;
+                        console.log('Loaded from JSONBin');
+                    }
+                }
+            } catch (binErr) {
+                console.log('JSONBin fetch failed:', binErr.message);
+            }
+        }
+
+        if (!dataPackage) {
             alert('Shared memories not found. The link may have expired.');
             return;
         }
 
-        const parsedData = JSON.parse(storedData);
-        
-        // Check if link has expired
-        if (parsedData.expiry && Date.now() > parsedData.expiry) {
-            alert('This link has expired (valid for 30 days).');
-            localStorage.removeItem(id);
-            return;
-        }
-
-        const dataPackage = parsedData.data;
         const memories = dataPackage.memories || [];
         const subtext = dataPackage.subtext || 'our beautiful memories ❤️';
 
         sublineEl.innerText = subtext;
         renderGallery(memories);
-        console.log('Successfully loaded from localStorage');
+        console.log('Successfully loaded memories');
+
     } catch (err) {
         alert('Failed to load shared memories.\n\nError: ' + err.message);
-        console.error('localStorage error:', err);
+        console.error('Error:', err);
     }
 }
 
