@@ -173,7 +173,7 @@ addMemoryBtn.addEventListener('click', () => {
     imageUpload.click();
 });
 
-// ===== GENERATE SHARE LINK (using localStorage with auto-expiry) =====
+// ===== GENERATE SHARE LINK (using Firebase for cross-device sharing) =====
 generateLinkBtn.addEventListener('click', async () => {
     if (!memories || memories.length === 0) {
         alert('Add at least one memory before generating a link.');
@@ -200,12 +200,22 @@ generateLinkBtn.addEventListener('click', async () => {
         // Generate a short unique ID (8 characters)
         const linkId = Math.random().toString(36).substring(2, 10) + Math.random().toString(36).substring(2, 10);
 
-        // Store data in localStorage with expiry (30 days)
-        const expiryTime = Date.now() + (30 * 24 * 60 * 60 * 1000);
-        localStorage.setItem(linkId, JSON.stringify({
-            data: dataPackage,
-            expiry: expiryTime
-        }));
+        // Check if Firebase is initialized
+        if (window.database) {
+            // Store in Firebase for cross-device sharing
+            await window.database.ref(`memories/${linkId}`).set({
+                data: dataPackage,
+                createdAt: firebase.database.ServerValue.TIMESTAMP,
+                expiresAt: Date.now() + (30 * 24 * 60 * 60 * 1000) // 30 days
+            });
+        } else {
+            // Fallback to localStorage if Firebase fails
+            const expiryTime = Date.now() + (30 * 24 * 60 * 60 * 1000);
+            localStorage.setItem(linkId, JSON.stringify({
+                data: dataPackage,
+                expiry: expiryTime
+            }));
+        }
 
         // Generate short viewer URL
         const baseUrl = window.location.origin + window.location.pathname.replace('index.html', '');
