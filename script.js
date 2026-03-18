@@ -173,7 +173,7 @@ addMemoryBtn.addEventListener('click', () => {
     imageUpload.click();
 });
 
-// ===== GENERATE SHARE LINK (Via Supabase Database) =====
+// ===== GENERATE SHARE LINK (Via URL Compression - Works Everywhere) =====
 generateLinkBtn.addEventListener('click', async () => {
     if (!memories || memories.length === 0) {
         alert('Add at least one memory before generating a link.');
@@ -188,47 +188,34 @@ generateLinkBtn.addEventListener('click', async () => {
     const jsonString = JSON.stringify(dataPackage);
     const sizeInMB = jsonString.length / (1024 * 1024);
 
-    if (sizeInMB > 50) {
-        alert(`❌ Total data size is ${sizeInMB.toFixed(2)}MB. Please reduce the number of photos.`);
-        return;
+    if (sizeInMB > 10) {
+        alert(`⚠️ Data is ${sizeInMB.toFixed(2)}MB - reduce photos or use fewer/smaller images for better performance.`);
     }
 
     try {
         generateLinkBtn.disabled = true;
-        generateLinkBtn.innerText = 'Creating link...';
+        generateLinkBtn.innerText = 'Compressing...';
 
-        // Generate unique ID
-        const linkId = Math.random().toString(36).substr(2, 9).toUpperCase();
-
-        // Store in Supabase (cloud database - accessible from any device)
-        const response = await fetch(
-            'https://aolmcvbtfkkxjqawwiqy.supabase.co/rest/v1/shares',
-            {
-                method: 'POST',
-                headers: {
-                    'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFvbG1jdmJ0ZmtreGpxYXd3aXF5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3MTA4Njc5MjgsImV4cCI6MTk5Njc0NzkyOH0.KDH4VpYYT5qQJg5QQrQqYYQqYYQqYYQqYYQqYYQqYYQ',
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    id: linkId,
-                    data: dataPackage,
-                    created_at: new Date().toISOString()
-                })
-            }
-        );
-
-        if (!response.ok) {
-            throw new Error(`Database error: ${response.status}`);
+        // Use LZ-String compression to reduce size
+        if (typeof LZString === 'undefined') {
+            throw new Error('Compression library not loaded');
         }
 
-        // Create the shareable link
+        // Compress the data
+        const compressed = LZString.compressToEncodedURIComponent(jsonString);
+        
+        console.log('Original size:', (jsonString.length / 1024).toFixed(2), 'KB');
+        console.log('Compressed size:', (compressed.length / 1024).toFixed(2), 'KB');
+        console.log('Compression ratio:', (100 - (compressed.length / jsonString.length * 100)).toFixed(1), '%');
+
+        // Create the shareable link with compressed data in URL
         const baseUrl = window.location.origin + window.location.pathname.replace('index.html', '');
-        const viewerUrl = `${baseUrl}viewer.html?id=${linkId}`;
+        const viewerUrl = `${baseUrl}viewer.html?data=${compressed}`;
 
         shareLinkInput.value = viewerUrl;
         linkPopup.classList.remove('hidden');
 
-        console.log('Link created successfully:', linkId);
+        console.log('Link created successfully - data embedded in URL');
 
     } catch (err) {
         alert('Failed to create share link.\n\nError: ' + err.message);

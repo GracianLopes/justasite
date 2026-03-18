@@ -13,47 +13,35 @@ const closeModal = document.querySelector('.close');
 
 // Get data from URL parameter
 const urlParams = new URLSearchParams(window.location.search);
-const linkId = urlParams.get('id');
+const compressedData = urlParams.get('data');
 
-if (!linkId) {
+if (!compressedData) {
     alert('No shared data found. Invalid link.');
 } else {
-    loadMemories(linkId);
+    loadMemories(compressedData);
 }
 
-async function loadMemories(id) {
+function loadMemories(compressedData) {
     try {
-        // Fetch from Supabase database
-        const response = await fetch(
-            `https://aolmcvbtfkkxjqawwiqy.supabase.co/rest/v1/shares?id=eq.${id}`,
-            {
-                method: 'GET',
-                headers: {
-                    'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFvbG1jdmJ0ZmtreGpxYXd3aXF5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3MTA4Njc5MjgsImV4cCI6MTk5Njc0NzkyOH0.KDH4VpYYT5qQJg5QQrQqYYQqYYQqYYQqYYQqYYQqYYQ',
-                    'Content-Type': 'application/json'
-                }
-            }
-        );
-
-        if (!response.ok) {
-            throw new Error(`Database error: ${response.status}`);
+        // Check if LZ-String is loaded
+        if (typeof LZString === 'undefined') {
+            throw new Error('Decompression library not loaded');
         }
 
-        const data = await response.json();
-
-        if (!data || data.length === 0) {
-            alert('Shared memories not found. The link may have expired.');
-            return;
+        // Decompress the data
+        const jsonString = LZString.decompressFromEncodedURIComponent(compressedData);
+        
+        if (!jsonString) {
+            throw new Error('Failed to decompress data - link may be corrupted');
         }
 
-        const shareData = data[0];
-        const dataPackage = shareData.data;
+        const dataPackage = JSON.parse(jsonString);
         const memories = dataPackage.memories || [];
         const subtext = dataPackage.subtext || 'our beautiful memories ❤️';
 
         sublineEl.innerText = subtext;
         renderGallery(memories);
-        console.log('Successfully loaded from database');
+        console.log('Successfully loaded memories from compressed URL');
 
     } catch (err) {
         alert('Failed to load shared memories.\n\nError: ' + err.message);
