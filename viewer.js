@@ -20,13 +20,12 @@ const linkId = urlParams.get('id');
 if (!compressedData && !encodedData && !linkId) {
     alert('No shared data found.');
 } else if (compressedData) {
-    // Decompress data from URL
+    // Decompress data from URL (LZ-String.compressToBase64 output is already URL-safe)
     try {
-        const decompressed = decodeURIComponent(compressedData);
-        const jsonString = LZString.decompressFromBase64(decompressed);
+        const jsonString = LZString.decompressFromBase64(compressedData);
         
         if (!jsonString) {
-            throw new Error('Failed to decompress data');
+            throw new Error('Failed to decompress data. The link may be corrupted.');
         }
 
         const data = JSON.parse(jsonString);
@@ -39,7 +38,7 @@ if (!compressedData && !encodedData && !linkId) {
         console.log('Successfully loaded compressed memories');
     } catch (err) {
         alert('Failed to load shared memories.\n\nError: ' + err.message);
-        console.error(err);
+        console.error('Decompression error:', err);
     }
 } else if (encodedData) {
     // Legacy: Data is embedded in URL as base64

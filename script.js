@@ -197,19 +197,16 @@ generateLinkBtn.addEventListener('click', async () => {
         generateLinkBtn.disabled = true;
         generateLinkBtn.innerText = 'Compressing & creating link...';
 
-        // Compress data with LZ-String
+        // Compress data with LZ-String (produces URL-safe base64)
         const compressed = LZString.compressToBase64(jsonString);
-        
-        // URL-safe encoding
-        const encodedData = encodeURIComponent(compressed);
         
         console.log('Original size:', (jsonString.length / 1024).toFixed(2), 'KB');
         console.log('Compressed size:', (compressed.length / 1024).toFixed(2), 'KB');
         console.log('Compression ratio:', (100 - (compressed.length / jsonString.length * 100)).toFixed(1), '%');
 
-        // Generate viewer URL
+        // Simple URL encoding - LZ-String.compressToBase64 already returns URL-safe string
         const baseUrl = window.location.origin + window.location.pathname.replace('index.html', '');
-        const viewerUrl = `${baseUrl}viewer.html?z=${encodedData}`;
+        const viewerUrl = `${baseUrl}viewer.html?z=${compressed}`;
 
         shareLinkInput.value = viewerUrl;
         linkPopup.classList.remove('hidden');
