@@ -23,59 +23,37 @@ if (!linkId) {
 
 async function loadMemories(id) {
     try {
-        let dataPackage = null;
-
-        // Try localStorage first (works immediately, same device)
-        const localData = localStorage.getItem(`share_${id}`);
-        if (localData) {
-            const parsedData = JSON.parse(localData);
-            
-            // Check if link has expired
-            if (parsedData.expiry && Date.now() > parsedData.expiry) {
-                alert('This link has expired (valid for 30 days).');
-                localStorage.removeItem(`share_${id}`);
-            } else {
-                dataPackage = parsedData.data;
-                console.log('Loaded from localStorage');
-            }
-        }
-
-        // If not in localStorage, try JSONBin (cross-device)
-        if (!dataPackage) {
-            try {
-                // Search for the share on JSONBin
-                const binResponse = await fetch(`https://api.jsonbin.io/v3/b`, {
-                    method: 'GET',
-                    headers: {
-                        'X-Master-Key': '$2b$10$EXwigf9pvclaim0GW.AoN.default'
-                    }
-                });
-
-                if (binResponse.ok) {
-                    const bins = await binResponse.json();
-                    // Find the bin with matching shareId
-                    const foundBin = bins.records?.find(bin => bin.shareId === id);
-                    if (foundBin) {
-                        dataPackage = foundBin.data;
-                        console.log('Loaded from JSONBin');
-                    }
+        // Fetch from Supabase database
+        const response = await fetch(
+            `https://aolmcvbtfkkxjqawwiqy.supabase.co/rest/v1/shares?id=eq.${id}`,
+            {
+                method: 'GET',
+                headers: {
+                    'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFvbG1jdmJ0ZmtreGpxYXd3aXF5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3MTA4Njc5MjgsImV4cCI6MTk5Njc0NzkyOH0.KDH4VpYYT5qQJg5QQrQqYYQqYYQqYYQqYYQqYYQqYYQ',
+                    'Content-Type': 'application/json'
                 }
-            } catch (binErr) {
-                console.log('JSONBin fetch failed:', binErr.message);
             }
+        );
+
+        if (!response.ok) {
+            throw new Error(`Database error: ${response.status}`);
         }
 
-        if (!dataPackage) {
+        const data = await response.json();
+
+        if (!data || data.length === 0) {
             alert('Shared memories not found. The link may have expired.');
             return;
         }
 
+        const shareData = data[0];
+        const dataPackage = shareData.data;
         const memories = dataPackage.memories || [];
         const subtext = dataPackage.subtext || 'our beautiful memories ❤️';
 
         sublineEl.innerText = subtext;
         renderGallery(memories);
-        console.log('Successfully loaded memories');
+        console.log('Successfully loaded from database');
 
     } catch (err) {
         alert('Failed to load shared memories.\n\nError: ' + err.message);

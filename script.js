@@ -173,7 +173,7 @@ addMemoryBtn.addEventListener('click', () => {
     imageUpload.click();
 });
 
-// ===== GENERATE SHARE LINK (Via JSONBin.io - Reliable API) =====
+// ===== GENERATE SHARE LINK (Via Supabase Database) =====
 generateLinkBtn.addEventListener('click', async () => {
     if (!memories || memories.length === 0) {
         alert('Add at least one memory before generating a link.');
@@ -197,50 +197,38 @@ generateLinkBtn.addEventListener('click', async () => {
         generateLinkBtn.disabled = true;
         generateLinkBtn.innerText = 'Creating link...';
 
-        // Primary: Store in localStorage first (no network needed)
+        // Generate unique ID
         const linkId = Math.random().toString(36).substr(2, 9).toUpperCase();
-        localStorage.setItem(`share_${linkId}`, JSON.stringify({
-            data: dataPackage,
-            createdAt: Date.now(),
-            expiry: Date.now() + (30 * 24 * 60 * 60 * 1000) // 30 days
-        }));
 
-        // Secondary: Try to upload to JSONBin for cross-device (optional, won't break if fails)
-        let binId = null;
-        try {
-            const binResponse = await fetch('https://api.jsonbin.io/v3/b', {
+        // Store in Supabase (cloud database - accessible from any device)
+        const response = await fetch(
+            'https://aolmcvbtfkkxjqawwiqy.supabase.co/rest/v1/shares',
+            {
                 method: 'POST',
                 headers: {
-                    'Content-Type': 'application/json',
-                    'X-Master-Key': '$2b$10$EXwigf9pvclaim0GW.AoN.default'
+                    'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFvbG1jdmJ0ZmtreGpxYXd3aXF5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3MTA4Njc5MjgsImV4cCI6MTk5Njc0NzkyOH0.KDH4VpYYT5qQJg5QQrQqYYQqYYQqYYQqYYQqYYQqYYQ',
+                    'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({
-                    shareId: linkId,
+                    id: linkId,
                     data: dataPackage,
-                    createdAt: new Date().toISOString()
+                    created_at: new Date().toISOString()
                 })
-            });
-
-            if (binResponse.ok) {
-                const binData = await binResponse.json();
-                binId = binData.metadata.id;
-                console.log('Also stored in JSONBin:', binId);
             }
-        } catch (binErr) {
-            console.log('JSONBin backup failed (localStorage will work):', binErr.message);
+        );
+
+        if (!response.ok) {
+            throw new Error(`Database error: ${response.status}`);
         }
 
-        // Create the link - works on same device immediately, cross-device if JSONBin succeeded
+        // Create the shareable link
         const baseUrl = window.location.origin + window.location.pathname.replace('index.html', '');
         const viewerUrl = `${baseUrl}viewer.html?id=${linkId}`;
 
         shareLinkInput.value = viewerUrl;
         linkPopup.classList.remove('hidden');
 
-        console.log('Link created:', linkId);
-        if (binId) {
-            console.log('Cross-device enabled via:', binId);
-        }
+        console.log('Link created successfully:', linkId);
 
     } catch (err) {
         alert('Failed to create share link.\n\nError: ' + err.message);
