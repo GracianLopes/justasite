@@ -174,7 +174,7 @@ addMemoryBtn.addEventListener('click', () => {
 });
 
 // ===== GENERATE SHARE LINK (Via URL Compression - Works Everywhere) =====
-generateLinkBtn.addEventListener('click', async () => {
+generateLinkBtn.addEventListener('click', () => {
     if (!memories || memories.length === 0) {
         alert('Add at least one memory before generating a link.');
         return;
@@ -196,14 +196,18 @@ generateLinkBtn.addEventListener('click', async () => {
         generateLinkBtn.disabled = true;
         generateLinkBtn.innerText = 'Compressing...';
 
-        // Use LZ-String compression to reduce size
+        // Check if LZ-String is loaded
         if (typeof LZString === 'undefined') {
-            throw new Error('Compression library not loaded');
+            throw new Error('LZ-String compression library failed to load. Please refresh the page.');
         }
 
         // Compress the data
         const compressed = LZString.compressToEncodedURIComponent(jsonString);
         
+        if (!compressed) {
+            throw new Error('Compression failed - data may be too large');
+        }
+
         console.log('Original size:', (jsonString.length / 1024).toFixed(2), 'KB');
         console.log('Compressed size:', (compressed.length / 1024).toFixed(2), 'KB');
         console.log('Compression ratio:', (100 - (compressed.length / jsonString.length * 100)).toFixed(1), '%');
@@ -215,11 +219,11 @@ generateLinkBtn.addEventListener('click', async () => {
         shareLinkInput.value = viewerUrl;
         linkPopup.classList.remove('hidden');
 
-        console.log('Link created successfully - data embedded in URL');
+        console.log('Link created successfully!');
 
     } catch (err) {
-        alert('Failed to create share link.\n\nError: ' + err.message);
-        console.error('Error:', err);
+        alert('Failed to create share link.\n\nError: ' + err.message + '\n\nPlease try refreshing the page.');
+        console.error('Full error:', err);
     } finally {
         generateLinkBtn.disabled = false;
         generateLinkBtn.innerText = '🔗 Generate share link';
