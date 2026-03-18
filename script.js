@@ -173,8 +173,8 @@ addMemoryBtn.addEventListener('click', () => {
     imageUpload.click();
 });
 
-// ===== GENERATE SHARE LINK (Hybrid: localStorage + GitHub Gists) =====
-generateLinkBtn.addEventListener('click', () => {
+// ===== GENERATE SHARE LINK (Cross-Device with Supabase) =====
+generateLinkBtn.addEventListener('click', async () => {
     if (!memories || memories.length === 0) {
         alert('Add at least one memory before generating a link.');
         return;
@@ -201,11 +201,40 @@ generateLinkBtn.addEventListener('click', () => {
         
         // Store in localStorage (works on same device immediately)
         localStorage.setItem(`memo_${linkId}`, jsonString);
+        localStorage.setItem(`memo_exp_${linkId}`, (Date.now() + (30 * 24 * 60 * 60 * 1000)).toString());
         
-        // Also store expiry info
-        localStorage.setItem(`memo_exp_${linkId}`, Date.now() + (30 * 24 * 60 * 60 * 1000).toString());
-        
-        console.log('Data stored locally with ID:', linkId);
+        console.log('Stored locally with ID:', linkId);
+
+        // Also upload to Supabase for cross-device access
+        try {
+            const supabaseUrl = 'https://aolmcvbtfkkxjqawwiqy.supabase.co';
+            const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFvbG1jdmJ0ZmtreGpxYXd3aXF5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3MTA4Njc5MjgsImV4cCI6MTk5Njc0NzkyOH0.KDH4VpYYT5qQJg5QQrQqYYQqYYQqYYQqYYQqYYQqYYQ';
+            
+            const response = await fetch(`${supabaseUrl}/rest/v1/anniversary_shares`, {
+                method: 'POST',
+                headers: {
+                    'apikey': supabaseKey,
+                    'Authorization': `Bearer ${supabaseKey}`,
+                    'Content-Type': 'application/json',
+                    'Prefer': 'return=minimal'
+                },
+                body: JSON.stringify({
+                    link_id: linkId,
+                    data: dataPackage,
+                    created_at: new Date().toISOString(),
+                    expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
+                })
+            });
+
+            if (response.ok) {
+                console.log('✅ Uploaded to Supabase for cross-device sharing');
+            } else {
+                const error = await response.text();
+                console.warn('⚠️ Supabase upload failed (will still work on same device):', error);
+            }
+        } catch (uploadErr) {
+            console.warn('⚠️ Could not upload to Supabase (will use localStorage):', uploadErr.message);
+        }
 
         // Create SHORT link with just the ID
         const baseUrl = window.location.origin + window.location.pathname.replace('index.html', '');
@@ -214,7 +243,7 @@ generateLinkBtn.addEventListener('click', () => {
         shareLinkInput.value = viewerUrl;
         linkPopup.classList.remove('hidden');
 
-        console.log('Short link created:', viewerUrl);
+        console.log('Link created:', viewerUrl);
         console.log('Link length:', viewerUrl.length, 'characters');
 
     } catch (err) {

@@ -21,9 +21,11 @@ if (!linkId) {
     loadMemories(linkId);
 }
 
-function loadMemories(id) {
+async function loadMemories(id) {
     try {
-        // First, try to load from localStorage (same device or cached)
+        let dataPackage = null;
+
+        // First, try to load from localStorage (same device)
         const storedJson = localStorage.getItem(`memo_${id}`);
         const expiry = localStorage.getItem(`memo_exp_${id}`);
 
@@ -32,35 +34,65 @@ function loadMemories(id) {
             if (Date.now() > parseInt(expiry)) {
                 localStorage.removeItem(`memo_${id}`);
                 localStorage.removeItem(`memo_exp_${id}`);
-                alert('This link has expired (valid for 30 days).');
-                return;
-            }
+                console.log('localStorage data expired, trying Supabase...');
+            } else {
+                // Load from localStorage
+                try {
+                    dataPackage = JSON.parse(storedJson);
+                    const memories = dataPackage.memories || [];
+                    const subtext = dataPackage.subtext || 'our beautiful memories ❤️';
 
-            // Load from localStorage
-            try {
-                const dataPackage = JSON.parse(storedJson);
+                    sublineEl.innerText = subtext;
+                    renderGallery(memories);
+                    console.log('✅ Loaded from localStorage');
+                    return;
+                } catch (parseErr) {
+                    console.error('Failed to parse localStorage:', parseErr);
+                    localStorage.removeItem(`memo_${id}`);
+                }
+            }
+        }
+
+        // If not in localStorage, try Supabase (cross-device)
+        console.log('Fetching from Supabase for cross-device access...');
+        const supabaseUrl = 'https://aolmcvbtfkkxjqawwiqy.supabase.co';
+        const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFvbG1jdmJ0ZmtreGpxYXd3aXF5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3MTA4Njc5MjgsImV4cCI6MTk5Njc0NzkyOH0.KDH4VpYYT5qQJg5QQrQqYYQqYYQqYYQqYYQqYYQqYYQ';
+        
+        const response = await fetch(
+            `${supabaseUrl}/rest/v1/anniversary_shares?link_id=eq.${id}`,
+            {
+                method: 'GET',
+                headers: {
+                    'apikey': supabaseKey,
+                    'Authorization': `Bearer ${supabaseKey}`
+                }
+            }
+        );
+
+        if (response.ok) {
+            const rows = await response.json();
+            
+            if (rows && rows.length > 0) {
+                dataPackage = rows[0].data;
                 const memories = dataPackage.memories || [];
                 const subtext = dataPackage.subtext || 'our beautiful memories ❤️';
 
                 sublineEl.innerText = subtext;
                 renderGallery(memories);
-                console.log('Successfully loaded from localStorage');
+                console.log('✅ Loaded from Supabase - works cross-device!');
                 return;
-            } catch (parseErr) {
-                console.error('Failed to parse localStorage data:', parseErr);
-                localStorage.removeItem(`memo_${id}`);
-                localStorage.removeItem(`memo_exp_${id}`);
             }
+        } else {
+            console.warn('Supabase response error:', response.status);
         }
 
-        // If not in localStorage, show message
-        alert('Shared memories not found. This link only works on the device where it was created, or refresh if you just created it.');
+        // If we get here, data not found anywhere
+        alert('Shared memories not found. The link may have expired or is invalid.');
         console.log('Link ID:', id);
-        console.log('Available IDs in storage:', Object.keys(localStorage).filter(k => k.startsWith('memo_')));
 
     } catch (err) {
+        console.error('Error loading memories:', err);
         alert('Failed to load shared memories.\n\nError: ' + err.message);
-        console.error('Error:', err);
     }
 }
 
