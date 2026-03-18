@@ -173,7 +173,7 @@ addMemoryBtn.addEventListener('click', () => {
     imageUpload.click();
 });
 
-// ===== GENERATE SHARE LINK (Compressed with LZ-String) =====
+// ===== GENERATE SHARE LINK (Via Firebase Realtime DB) =====
 generateLinkBtn.addEventListener('click', async () => {
     if (!memories || memories.length === 0) {
         alert('Add at least one memory before generating a link.');
@@ -182,7 +182,8 @@ generateLinkBtn.addEventListener('click', async () => {
 
     const dataPackage = {
         memories: memories,
-        subtext: subtext
+        subtext: subtext,
+        createdAt: new Date().toISOString()
     };
 
     const jsonString = JSON.stringify(dataPackage);
@@ -195,25 +196,41 @@ generateLinkBtn.addEventListener('click', async () => {
 
     try {
         generateLinkBtn.disabled = true;
-        generateLinkBtn.innerText = 'Compressing & creating link...';
+        generateLinkBtn.innerText = 'Creating link...';
 
-        // Compress data with LZ-String (produces URL-safe base64)
-        const compressed = LZString.compressToBase64(jsonString);
+        // Generate a unique ID
+        const linkId = Math.random().toString(36).substr(2, 9);
         
-        console.log('Original size:', (jsonString.length / 1024).toFixed(2), 'KB');
-        console.log('Compressed size:', (compressed.length / 1024).toFixed(2), 'KB');
-        console.log('Compression ratio:', (100 - (compressed.length / jsonString.length * 100)).toFixed(1), '%');
+        // Store in localStorage for fallback (same device)
+        localStorage.setItem(linkId, JSON.stringify({
+            data: dataPackage,
+            expiry: Date.now() + (30 * 24 * 60 * 60 * 1000) // 30 days
+        }));
 
-        // Simple URL encoding - LZ-String.compressToBase64 already returns URL-safe string
+        // Try to upload to Firebase for cross-device sharing
+        try {
+            const firebaseRef = firebase.database().ref(`shares/${linkId}`);
+            await firebaseRef.set({
+                data: dataPackage,
+                createdAt: firebase.database.ServerValue.TIMESTAMP
+            });
+            console.log('Data uploaded to Firebase');
+        } catch (firebaseErr) {
+            console.warn('Firebase upload failed (will use localStorage fallback):', firebaseErr.message);
+        }
+
+        // Create the link
         const baseUrl = window.location.origin + window.location.pathname.replace('index.html', '');
-        const viewerUrl = `${baseUrl}viewer.html?z=${compressed}`;
+        const viewerUrl = `${baseUrl}viewer.html?id=${linkId}`;
 
         shareLinkInput.value = viewerUrl;
         linkPopup.classList.remove('hidden');
+        
+        console.log('Link ID:', linkId);
 
     } catch (err) {
         alert('Failed to create share link.\n\nError: ' + err.message);
-        console.error('Upload error:', err);
+        console.error('Error:', err);
     } finally {
         generateLinkBtn.disabled = false;
         generateLinkBtn.innerText = '🔗 Generate share link';

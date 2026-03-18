@@ -11,86 +11,68 @@ const modalImg = document.getElementById('modalImage');
 const modalCaption = document.getElementById('modalCaption');
 const closeModal = document.querySelector('.close');
 
-// Get data from compressed URL
+// Get data from URL parameter
 const urlParams = new URLSearchParams(window.location.search);
-const compressedData = urlParams.get('z');
-const encodedData = urlParams.get('data');
 const linkId = urlParams.get('id');
 
-if (!compressedData && !encodedData && !linkId) {
-    alert('No shared data found.');
-} else if (compressedData) {
-    // Decompress data from URL (LZ-String.compressToBase64 output is already URL-safe)
-    try {
-        const jsonString = LZString.decompressFromBase64(compressedData);
-        
-        if (!jsonString) {
-            throw new Error('Failed to decompress data. The link may be corrupted.');
-        }
-
-        const data = JSON.parse(jsonString);
-        const memories = data.memories || [];
-        const subtext = data.subtext || 'our beautiful memories ❤️';
-
-        sublineEl.innerText = subtext;
-        renderGallery(memories);
-        
-        console.log('Successfully loaded compressed memories');
-    } catch (err) {
-        alert('Failed to load shared memories.\n\nError: ' + err.message);
-        console.error('Decompression error:', err);
-    }
-} else if (encodedData) {
-    // Legacy: Data is embedded in URL as base64
-    try {
-        const base64Data = decodeURIComponent(encodedData)
-            .replace(/-/g, '+')
-            .replace(/_/g, '/');
-        const padding = '='.repeat((4 - base64Data.length % 4) % 4);
-        const jsonString = decodeURIComponent(atob(base64Data + padding));
-        const data = JSON.parse(jsonString);
-
-        const memories = data.memories || [];
-        const subtext = data.subtext || 'our beautiful memories ❤️';
-
-        sublineEl.innerText = subtext;
-        renderGallery(memories);
-    } catch (err) {
-        alert('Failed to load shared memories.\n\nError: ' + err.message);
-        console.error(err);
-    }
-} else if (linkId) {
-    // Legacy: Try localStorage fallback
-    loadFromLocalStorage(linkId);
+if (!linkId) {
+    alert('No shared data found. Invalid link.');
+} else {
+    // Try Firebase first, then fallback to localStorage
+    loadMemories(linkId);
 }
 
-// Fallback function to load from localStorage (for legacy links)
-function loadFromLocalStorage(linkId) {
+async function loadMemories(id) {
     try {
-        const storedData = localStorage.getItem(linkId);
-        
-        if (!storedData) {
-            alert('Shared memories not found. The link may have expired.');
-            console.error('Link ID not found:', linkId);
-        } else {
-            const parsedData = JSON.parse(storedData);
+        // Try Firebase first
+        try {
+            const firebaseRef = firebase.database().ref(`shares/${id}`);
+            const snapshot = await firebaseRef.get();
             
-            // Check if link has expired
-            if (parsedData.expiry && Date.now() > parsedData.expiry) {
-                alert('This link has expired (valid for 30 days).');
-                localStorage.removeItem(linkId);
-            } else {
-                const data = parsedData.data;
-                const memories = data.memories || [];
-                const subtext = data.subtext || 'our beautiful memories ❤️';
+            if (snapshot.exists()) {
+                const firebaseData = snapshot.val();
+                const dataPackage = firebaseData.data;
+                
+                const memories = dataPackage.memories || [];
+                const subtext = dataPackage.subtext || 'our beautiful memories ❤️';
 
                 sublineEl.innerText = subtext;
                 renderGallery(memories);
+                console.log('Successfully loaded from Firebase');
+                return;
             }
+        } catch (firebaseErr) {
+            console.warn('Firebase load failed, trying localStorage:', firebaseErr.message);
         }
+
+        // Fallback to localStorage
+        const storedData = localStorage.getItem(id);
+        
+        if (!storedData) {
+            alert('Shared memories not found. The link may have expired.');
+            return;
+        }
+
+        const parsedData = JSON.parse(storedData);
+        
+        // Check if link has expired
+        if (parsedData.expiry && Date.now() > parsedData.expiry) {
+            alert('This link has expired (valid for 30 days).');
+            localStorage.removeItem(id);
+            return;
+        }
+
+        const dataPackage = parsedData.data;
+        const memories = dataPackage.memories || [];
+        const subtext = dataPackage.subtext || 'our beautiful memories ❤️';
+
+        sublineEl.innerText = subtext;
+        renderGallery(memories);
+        console.log('Successfully loaded from localStorage');
+        
     } catch (err) {
         alert('Failed to load shared memories.\n\nError: ' + err.message);
-        console.error(err);
+        console.error('Error:', err);
     }
 }
 
