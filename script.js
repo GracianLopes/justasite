@@ -173,7 +173,7 @@ addMemoryBtn.addEventListener('click', () => {
     imageUpload.click();
 });
 
-// ===== GENERATE SHARE LINK (using localStorage + Session ID) =====
+// ===== GENERATE SHARE LINK (using compressed URL encoding) =====
 generateLinkBtn.addEventListener('click', async () => {
     if (!memories || memories.length === 0) {
         alert('Add at least one memory before generating a link.');
@@ -197,15 +197,15 @@ generateLinkBtn.addEventListener('click', async () => {
         generateLinkBtn.disabled = true;
         generateLinkBtn.innerText = 'Creating share link...';
 
-        // Generate a unique session ID
-        const sessionId = 'session_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+        // Compress data using LZ-string
+        const compressed = LZString.compressToBase64(jsonString);
+        
+        // Encode for URL safety
+        const encodedData = encodeURIComponent(compressed);
 
-        // Store data in localStorage with session ID as key
-        localStorage.setItem(sessionId, jsonString);
-
-        // Generate the viewer URL with session ID
+        // Generate the viewer URL with compressed data
         const baseUrl = window.location.origin + window.location.pathname.replace('index.html', '');
-        const viewerUrl = `${baseUrl}viewer.html?session=${sessionId}`;
+        const viewerUrl = `${baseUrl}viewer.html?data=${encodedData}`;
 
         shareLinkInput.value = viewerUrl;
         linkPopup.classList.remove('hidden');

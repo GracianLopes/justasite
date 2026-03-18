@@ -13,26 +13,26 @@ const closeModal = document.querySelector('.close');
 
 // Get data from localStorage using session ID
 const urlParams = new URLSearchParams(window.location.search);
-const sessionId = urlParams.get('session');
+const encodedData = urlParams.get('data');
 
-if (!sessionId) {
+if (!encodedData) {
     alert('No shared data found.');
 } else {
     try {
-        // Retrieve data from localStorage
-        const jsonString = localStorage.getItem(sessionId);
+        // Decode URL-encoded data and decompress
+        const compressed = decodeURIComponent(encodedData);
+        const jsonString = LZString.decompressFromBase64(compressed);
         
         if (!jsonString) {
-            alert('Shared memories not found. The link may have expired or been used on a different device/browser.');
-            console.error('Session ID not found in localStorage:', sessionId);
-        } else {
-            const data = JSON.parse(jsonString);
-            const memories = data.memories || [];
-            const subtext = data.subtext || 'our beautiful memories ❤️';
-
-            sublineEl.innerText = subtext;
-            renderGallery(memories);
+            throw new Error('Failed to decompress data');
         }
+
+        const data = JSON.parse(jsonString);
+        const memories = data.memories || [];
+        const subtext = data.subtext || 'our beautiful memories ❤️';
+
+        sublineEl.innerText = subtext;
+        renderGallery(memories);
     } catch (err) {
         alert('Failed to load shared memories.\n\nError: ' + err.message);
         console.error(err);
