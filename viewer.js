@@ -11,15 +11,38 @@ const modalImg = document.getElementById('modalImage');
 const modalCaption = document.getElementById('modalCaption');
 const closeModal = document.querySelector('.close');
 
-// Get data from Firebase, localStorage, or URL
+// Get data from compressed URL
 const urlParams = new URLSearchParams(window.location.search);
-const linkId = urlParams.get('id');
+const compressedData = urlParams.get('z');
 const encodedData = urlParams.get('data');
+const linkId = urlParams.get('id');
 
-if (!linkId && !encodedData) {
+if (!compressedData && !encodedData && !linkId) {
     alert('No shared data found.');
+} else if (compressedData) {
+    // Decompress data from URL
+    try {
+        const decompressed = decodeURIComponent(compressedData);
+        const jsonString = LZString.decompressFromBase64(decompressed);
+        
+        if (!jsonString) {
+            throw new Error('Failed to decompress data');
+        }
+
+        const data = JSON.parse(jsonString);
+        const memories = data.memories || [];
+        const subtext = data.subtext || 'our beautiful memories ❤️';
+
+        sublineEl.innerText = subtext;
+        renderGallery(memories);
+        
+        console.log('Successfully loaded compressed memories');
+    } catch (err) {
+        alert('Failed to load shared memories.\n\nError: ' + err.message);
+        console.error(err);
+    }
 } else if (encodedData) {
-    // Data is embedded in URL as base64
+    // Legacy: Data is embedded in URL as base64
     try {
         const base64Data = decodeURIComponent(encodedData)
             .replace(/-/g, '+')
@@ -37,43 +60,12 @@ if (!linkId && !encodedData) {
         alert('Failed to load shared memories.\n\nError: ' + err.message);
         console.error(err);
     }
-} else {
-    // Try Firebase first
-    if (window.database) {
-        window.database.ref(`memories/${linkId}`).once('value')
-            .then(snapshot => {
-                if (snapshot.exists()) {
-                    const storedData = snapshot.val();
-                    
-                    // Check if expired
-                    if (storedData.expiresAt && Date.now() > storedData.expiresAt) {
-                        alert('This link has expired (valid for 30 days).');
-                        // Optional: Delete expired entry
-                        window.database.ref(`memories/${linkId}`).remove();
-                    } else {
-                        const data = storedData.data;
-                        const memories = data.memories || [];
-                        const subtext = data.subtext || 'our beautiful memories ❤️';
-
-                        sublineEl.innerText = subtext;
-                        renderGallery(memories);
-                    }
-                } else {
-                    // Firebase doesn't have it, try localStorage
-                    loadFromLocalStorage(linkId);
-                }
-            })
-            .catch(err => {
-                console.log('Firebase error, trying localStorage:', err);
-                loadFromLocalStorage(linkId);
-            });
-    } else {
-        // Firebase not available, use localStorage
-        loadFromLocalStorage(linkId);
-    }
+} else if (linkId) {
+    // Legacy: Try localStorage fallback
+    loadFromLocalStorage(linkId);
 }
 
-// Fallback function to load from localStorage
+// Fallback function to load from localStorage (for legacy links)
 function loadFromLocalStorage(linkId) {
     try {
         const storedData = localStorage.getItem(linkId);

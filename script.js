@@ -173,7 +173,7 @@ addMemoryBtn.addEventListener('click', () => {
     imageUpload.click();
 });
 
-// ===== GENERATE SHARE LINK (Hybrid: Firebase + localStorage fallback) =====
+// ===== GENERATE SHARE LINK (Compressed with LZ-String) =====
 generateLinkBtn.addEventListener('click', async () => {
     if (!memories || memories.length === 0) {
         alert('Add at least one memory before generating a link.');
@@ -188,50 +188,28 @@ generateLinkBtn.addEventListener('click', async () => {
     const jsonString = JSON.stringify(dataPackage);
     const sizeInMB = jsonString.length / (1024 * 1024);
 
-    if (sizeInMB > 4) {
+    if (sizeInMB > 50) {
         alert(`❌ Total data size is ${sizeInMB.toFixed(2)}MB. Please reduce the number of photos.`);
         return;
     }
 
     try {
         generateLinkBtn.disabled = true;
-        generateLinkBtn.innerText = 'Creating shareable link...';
+        generateLinkBtn.innerText = 'Compressing & creating link...';
 
-        // Generate a short unique ID
-        const linkId = Math.random().toString(36).substring(2, 10) + Math.random().toString(36).substring(2, 10);
+        // Compress data with LZ-String
+        const compressed = LZString.compressToBase64(jsonString);
+        
+        // URL-safe encoding
+        const encodedData = encodeURIComponent(compressed);
+        
+        console.log('Original size:', (jsonString.length / 1024).toFixed(2), 'KB');
+        console.log('Compressed size:', (compressed.length / 1024).toFixed(2), 'KB');
+        console.log('Compression ratio:', (100 - (compressed.length / jsonString.length * 100)).toFixed(1), '%');
 
-        // Try to save to Firebase if available
-        let savedToFirebase = false;
-        if (window.database) {
-            try {
-                await window.database.ref(`memories/${linkId}`).set({
-                    data: dataPackage,
-                    createdAt: Date.now(),
-                    expiresAt: Date.now() + (30 * 24 * 60 * 60 * 1000) // 30 days
-                });
-                savedToFirebase = true;
-                console.log('Data saved to Firebase');
-            } catch (fbErr) {
-                console.log('Firebase save failed, using base64 encoding:', fbErr);
-            }
-        }
-
-        // If Firebase not available or failed, use base64 encoding in URL
-        let viewerUrl;
-        if (!savedToFirebase) {
-            // Compress and encode data in URL
-            const base64Data = btoa(encodeURIComponent(jsonString))
-                .replace(/\+/g, '-')
-                .replace(/\//g, '_')
-                .replace(/=/g, '');
-            
-            const baseUrl = window.location.origin + window.location.pathname.replace('index.html', '');
-            viewerUrl = `${baseUrl}viewer.html?data=${base64Data}&id=${linkId}`;
-        } else {
-            // Use short ID if saved to Firebase
-            const baseUrl = window.location.origin + window.location.pathname.replace('index.html', '');
-            viewerUrl = `${baseUrl}viewer.html?id=${linkId}`;
-        }
+        // Generate viewer URL
+        const baseUrl = window.location.origin + window.location.pathname.replace('index.html', '');
+        const viewerUrl = `${baseUrl}viewer.html?z=${encodedData}`;
 
         shareLinkInput.value = viewerUrl;
         linkPopup.classList.remove('hidden');
