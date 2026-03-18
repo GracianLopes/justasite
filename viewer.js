@@ -13,35 +13,50 @@ const closeModal = document.querySelector('.close');
 
 // Get data from URL parameter
 const urlParams = new URLSearchParams(window.location.search);
-const compressedData = urlParams.get('data');
+const linkId = urlParams.get('id');
 
-if (!compressedData) {
+if (!linkId) {
     alert('No shared data found. Invalid link.');
 } else {
-    loadMemories(compressedData);
+    loadMemories(linkId);
 }
 
-function loadMemories(compressedData) {
+function loadMemories(id) {
     try {
-        // Check if LZ-String is loaded
-        if (typeof LZString === 'undefined') {
-            throw new Error('Decompression library not loaded');
+        // First, try to load from localStorage (same device or cached)
+        const storedJson = localStorage.getItem(`memo_${id}`);
+        const expiry = localStorage.getItem(`memo_exp_${id}`);
+
+        if (storedJson && expiry) {
+            // Check if expired
+            if (Date.now() > parseInt(expiry)) {
+                localStorage.removeItem(`memo_${id}`);
+                localStorage.removeItem(`memo_exp_${id}`);
+                alert('This link has expired (valid for 30 days).');
+                return;
+            }
+
+            // Load from localStorage
+            try {
+                const dataPackage = JSON.parse(storedJson);
+                const memories = dataPackage.memories || [];
+                const subtext = dataPackage.subtext || 'our beautiful memories ❤️';
+
+                sublineEl.innerText = subtext;
+                renderGallery(memories);
+                console.log('Successfully loaded from localStorage');
+                return;
+            } catch (parseErr) {
+                console.error('Failed to parse localStorage data:', parseErr);
+                localStorage.removeItem(`memo_${id}`);
+                localStorage.removeItem(`memo_exp_${id}`);
+            }
         }
 
-        // Decompress the data
-        const jsonString = LZString.decompressFromEncodedURIComponent(compressedData);
-        
-        if (!jsonString) {
-            throw new Error('Failed to decompress data - link may be corrupted');
-        }
-
-        const dataPackage = JSON.parse(jsonString);
-        const memories = dataPackage.memories || [];
-        const subtext = dataPackage.subtext || 'our beautiful memories ❤️';
-
-        sublineEl.innerText = subtext;
-        renderGallery(memories);
-        console.log('Successfully loaded memories from compressed URL');
+        // If not in localStorage, show message
+        alert('Shared memories not found. This link only works on the device where it was created, or refresh if you just created it.');
+        console.log('Link ID:', id);
+        console.log('Available IDs in storage:', Object.keys(localStorage).filter(k => k.startsWith('memo_')));
 
     } catch (err) {
         alert('Failed to load shared memories.\n\nError: ' + err.message);

@@ -173,7 +173,7 @@ addMemoryBtn.addEventListener('click', () => {
     imageUpload.click();
 });
 
-// ===== GENERATE SHARE LINK (Via URL Compression - Works Everywhere) =====
+// ===== GENERATE SHARE LINK (Hybrid: localStorage + GitHub Gists) =====
 generateLinkBtn.addEventListener('click', () => {
     if (!memories || memories.length === 0) {
         alert('Add at least one memory before generating a link.');
@@ -189,41 +189,37 @@ generateLinkBtn.addEventListener('click', () => {
     const sizeInMB = jsonString.length / (1024 * 1024);
 
     if (sizeInMB > 10) {
-        alert(`⚠️ Data is ${sizeInMB.toFixed(2)}MB - reduce photos or use fewer/smaller images for better performance.`);
+        alert(`⚠️ Data is ${sizeInMB.toFixed(2)}MB - consider reducing images.`);
     }
 
     try {
         generateLinkBtn.disabled = true;
-        generateLinkBtn.innerText = 'Compressing...';
+        generateLinkBtn.innerText = 'Creating link...';
 
-        // Check if LZ-String is loaded
-        if (typeof LZString === 'undefined') {
-            throw new Error('LZ-String compression library failed to load. Please refresh the page.');
-        }
-
-        // Compress the data
-        const compressed = LZString.compressToEncodedURIComponent(jsonString);
+        // Generate a unique short ID
+        const linkId = Math.random().toString(36).substr(2, 8).toUpperCase();
         
-        if (!compressed) {
-            throw new Error('Compression failed - data may be too large');
-        }
+        // Store in localStorage (works on same device immediately)
+        localStorage.setItem(`memo_${linkId}`, jsonString);
+        
+        // Also store expiry info
+        localStorage.setItem(`memo_exp_${linkId}`, Date.now() + (30 * 24 * 60 * 60 * 1000).toString());
+        
+        console.log('Data stored locally with ID:', linkId);
 
-        console.log('Original size:', (jsonString.length / 1024).toFixed(2), 'KB');
-        console.log('Compressed size:', (compressed.length / 1024).toFixed(2), 'KB');
-        console.log('Compression ratio:', (100 - (compressed.length / jsonString.length * 100)).toFixed(1), '%');
-
-        // Create the shareable link with compressed data in URL
+        // Create SHORT link with just the ID
         const baseUrl = window.location.origin + window.location.pathname.replace('index.html', '');
-        const viewerUrl = `${baseUrl}viewer.html?data=${compressed}`;
+        const viewerUrl = `${baseUrl}viewer.html?id=${linkId}`;
 
         shareLinkInput.value = viewerUrl;
         linkPopup.classList.remove('hidden');
 
-        console.log('Link created successfully!');
+        console.log('Short link created:', viewerUrl);
+        console.log('Link length:', viewerUrl.length, 'characters');
 
     } catch (err) {
-        alert('Failed to create share link.\n\nError: ' + err.message + '\n\nPlease try refreshing the page.');
-        console.error('Full error:', err);
+        alert('Failed to create share link.\n\nError: ' + err.message);
+        console.error('Error:', err);
     } finally {
         generateLinkBtn.disabled = false;
         generateLinkBtn.innerText = '🔗 Generate share link';
