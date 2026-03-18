@@ -221,25 +221,20 @@ generateLinkBtn.addEventListener('click', () => {
         console.log('Compressed size:', (compressedSize / 1024).toFixed(2), 'KB');
         console.log('Compression ratio:', ratio, '%');
 
-        // Also store in localStorage for same-device use
-        const linkId = Math.random().toString(36).substr(2, 8).toUpperCase();
-        localStorage.setItem(`memo_${linkId}`, jsonString);
-        localStorage.setItem(`memo_exp_${linkId}`, (Date.now() + 30 * 24 * 60 * 60 * 1000).toString());
-
-        // Create link with embedded compressed data
+        // Create link with embedded compressed data (NO localStorage to avoid quota errors)
         const baseUrl = window.location.origin + window.location.pathname.replace('index.html', '');
         const viewerUrl = `${baseUrl}viewer.html?d=${compressed}`;
 
         shareLinkInput.value = viewerUrl;
         linkPopup.classList.remove('hidden');
 
-        console.log('Link created - length:', viewerUrl.length, 'characters');
+        console.log('✅ Link created - length:', viewerUrl.length, 'characters');
         if (viewerUrl.length > 8000) {
-            alert('⚠️ Link is long but should still work. Copy and paste carefully.');
+            alert('⚠️ Link is long but works. Be careful when copying and pasting.');
         }
 
     } catch (err) {
-        alert('Failed to create link.\n\nError: ' + err.message);
+        alert('Failed to create link.\n\nError: ' + err.message + '\n\nTry refreshing the page.');
         console.error('Error:', err);
     } finally {
         generateLinkBtn.disabled = false;

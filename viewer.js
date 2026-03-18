@@ -14,18 +14,13 @@ const closeModal = document.querySelector('.close');
 // Get data from URL parameter
 const urlParams = new URLSearchParams(window.location.search);
 const compressedData = urlParams.get('d');
-const linkId = urlParams.get('id');
 
-console.log('URL params:', { d: !!compressedData, id: linkId });
+console.log('URL params:', { compressed: !!compressedData });
 
-if (!compressedData && !linkId) {
+if (!compressedData) {
     alert('No shared data found. Invalid link.');
-} else if (compressedData) {
-    // Decompress from URL
+} else {
     loadFromCompressed(compressedData);
-} else if (linkId) {
-    // Try localStorage or old method
-    loadFromId(linkId);
 }
 
 function loadFromCompressed(compressed) {
@@ -51,38 +46,6 @@ function loadFromCompressed(compressed) {
     } catch (err) {
         alert('Failed to load memories.\n\nError: ' + err.message);
         console.error('Decompression error:', err);
-    }
-}
-
-function loadFromId(id) {
-    try {
-        // Try localStorage first
-        const storedJson = localStorage.getItem(`memo_${id}`);
-        const expiry = localStorage.getItem(`memo_exp_${id}`);
-
-        if (!storedJson || !expiry) {
-            alert('Link not found. Please generate a new link or use the same device.');
-            return;
-        }
-
-        if (Date.now() > parseInt(expiry)) {
-            localStorage.removeItem(`memo_${id}`);
-            localStorage.removeItem(`memo_exp_${id}`);
-            alert('This link has expired (valid for 30 days).');
-            return;
-        }
-
-        const dataPackage = JSON.parse(storedJson);
-        const memories = dataPackage.memories || [];
-        const subtext = dataPackage.subtext || 'our beautiful memories ❤️';
-
-        sublineEl.innerText = subtext;
-        renderGallery(memories);
-        console.log('✅ Loaded from localStorage');
-
-    } catch (err) {
-        alert('Failed to load memories.\n\nError: ' + err.message);
-        console.error('Error:', err);
     }
 }
 
