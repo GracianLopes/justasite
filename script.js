@@ -173,7 +173,7 @@ addMemoryBtn.addEventListener('click', () => {
     imageUpload.click();
 });
 
-// ===== GENERATE SHARE LINK (using compressed URL encoding) =====
+// ===== GENERATE SHARE LINK (using localStorage with auto-expiry) =====
 generateLinkBtn.addEventListener('click', async () => {
     if (!memories || memories.length === 0) {
         alert('Add at least one memory before generating a link.');
@@ -195,17 +195,21 @@ generateLinkBtn.addEventListener('click', async () => {
 
     try {
         generateLinkBtn.disabled = true;
-        generateLinkBtn.innerText = 'Creating share link...';
+        generateLinkBtn.innerText = 'Creating short link...';
 
-        // Compress data using LZ-string
-        const compressed = LZString.compressToBase64(jsonString);
-        
-        // Encode for URL safety
-        const encodedData = encodeURIComponent(compressed);
+        // Generate a short unique ID (8 characters)
+        const linkId = Math.random().toString(36).substring(2, 10) + Math.random().toString(36).substring(2, 10);
 
-        // Generate the viewer URL with compressed data
+        // Store data in localStorage with expiry (30 days)
+        const expiryTime = Date.now() + (30 * 24 * 60 * 60 * 1000);
+        localStorage.setItem(linkId, JSON.stringify({
+            data: dataPackage,
+            expiry: expiryTime
+        }));
+
+        // Generate short viewer URL
         const baseUrl = window.location.origin + window.location.pathname.replace('index.html', '');
-        const viewerUrl = `${baseUrl}viewer.html?data=${encodedData}`;
+        const viewerUrl = `${baseUrl}viewer.html?id=${linkId}`;
 
         shareLinkInput.value = viewerUrl;
         linkPopup.classList.remove('hidden');

@@ -11,28 +11,36 @@ const modalImg = document.getElementById('modalImage');
 const modalCaption = document.getElementById('modalCaption');
 const closeModal = document.querySelector('.close');
 
-// Get data from localStorage using session ID
+// Get data from localStorage using short ID
 const urlParams = new URLSearchParams(window.location.search);
-const encodedData = urlParams.get('data');
+const linkId = urlParams.get('id');
 
-if (!encodedData) {
+if (!linkId) {
     alert('No shared data found.');
 } else {
     try {
-        // Decode URL-encoded data and decompress
-        const compressed = decodeURIComponent(encodedData);
-        const jsonString = LZString.decompressFromBase64(compressed);
+        // Retrieve data from localStorage
+        const storedData = localStorage.getItem(linkId);
         
-        if (!jsonString) {
-            throw new Error('Failed to decompress data');
+        if (!storedData) {
+            alert('Shared memories not found. The link may have expired.');
+            console.error('Link ID not found:', linkId);
+        } else {
+            const parsedData = JSON.parse(storedData);
+            
+            // Check if link has expired
+            if (parsedData.expiry && Date.now() > parsedData.expiry) {
+                alert('This link has expired (valid for 30 days).');
+                localStorage.removeItem(linkId);
+            } else {
+                const data = parsedData.data;
+                const memories = data.memories || [];
+                const subtext = data.subtext || 'our beautiful memories ❤️';
+
+                sublineEl.innerText = subtext;
+                renderGallery(memories);
+            }
         }
-
-        const data = JSON.parse(jsonString);
-        const memories = data.memories || [];
-        const subtext = data.subtext || 'our beautiful memories ❤️';
-
-        sublineEl.innerText = subtext;
-        renderGallery(memories);
     } catch (err) {
         alert('Failed to load shared memories.\n\nError: ' + err.message);
         console.error(err);
