@@ -11,14 +11,34 @@ const modalImg = document.getElementById('modalImage');
 const modalCaption = document.getElementById('modalCaption');
 const closeModal = document.querySelector('.close');
 
-// Get data from Firebase or localStorage using short ID
+// Get data from Firebase, localStorage, or URL
 const urlParams = new URLSearchParams(window.location.search);
 const linkId = urlParams.get('id');
+const encodedData = urlParams.get('data');
 
-if (!linkId) {
+if (!linkId && !encodedData) {
     alert('No shared data found.');
+} else if (encodedData) {
+    // Data is embedded in URL as base64
+    try {
+        const base64Data = decodeURIComponent(encodedData)
+            .replace(/-/g, '+')
+            .replace(/_/g, '/');
+        const padding = '='.repeat((4 - base64Data.length % 4) % 4);
+        const jsonString = decodeURIComponent(atob(base64Data + padding));
+        const data = JSON.parse(jsonString);
+
+        const memories = data.memories || [];
+        const subtext = data.subtext || 'our beautiful memories ❤️';
+
+        sublineEl.innerText = subtext;
+        renderGallery(memories);
+    } catch (err) {
+        alert('Failed to load shared memories.\n\nError: ' + err.message);
+        console.error(err);
+    }
 } else {
-    // Try Firebase first, fallback to localStorage
+    // Try Firebase first
     if (window.database) {
         window.database.ref(`memories/${linkId}`).once('value')
             .then(snapshot => {
